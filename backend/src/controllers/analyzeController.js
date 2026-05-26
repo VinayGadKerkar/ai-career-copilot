@@ -23,17 +23,11 @@ const startAnalysis = async (req, res) => {
     ]);
 
     if (!resume) {
-      return res.status(404).json({
-        success: false,
-        message: 'Resume not found'
-      });
+      return res.status(404).json({ success: false, message: 'Resume not found' });
     }
 
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
+      return res.status(404).json({ success: false, message: 'Job not found' });
     }
 
     // Create analysis job record

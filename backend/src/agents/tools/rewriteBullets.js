@@ -1,23 +1,25 @@
-const { ChatGroq } = require('@langchain/groq');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
+const { parseJsonSafely } = require('../../utils/parseJsonSafely');
+const { invokeGroq } = require('../../config/groq');
 
-const llm = new ChatGroq({
-  apiKey: process.env.GROQ_API_KEY,
-  model: 'llama-3.3-70b-versatile',
-  temperature: 0.5
-});
+const FALLBACK = {
+  rewrittenBullets: [],
+  newBulletsToAdd: [],
+  tipsForThisRole: ['Tailor your resume bullets to mirror keywords from the job description.']
+};
 
 const rewriteBullets = async ({ resumeText, jobDescription, missingSkills }) => {
-  const response = await llm.invoke([
-    new SystemMessage(`You are an expert resume writer specializing in 
-    backend engineering and software development roles.
-    Rewrite resume bullets to be more impactful and relevant to the job.
-    Use strong action verbs. Quantify where possible. Return ONLY valid JSON.`),
-
+  const response = await invokeGroq([
+    new SystemMessage(
+      `You are an expert resume writer specializing in backend engineering and software development roles.
+      Rewrite resume bullets to be more impactful and relevant to the job.
+      Use strong action verbs. Quantify where possible.
+      Return ONLY valid JSON — no markdown, no code fences, no explanation.`
+    ),
     new HumanMessage(`
     Rewrite the resume bullets to better match this job description.
-    Focus especially on incorporating these missing skills where truthful: 
-    ${missingSkills.join(', ')}
+    Focus especially on incorporating these missing skills where truthful:
+    ${(missingSkills || []).join(', ')}
 
     ORIGINAL RESUME:
     ${resumeText}
@@ -25,7 +27,7 @@ const rewriteBullets = async ({ resumeText, jobDescription, missingSkills }) => 
     TARGET JOB DESCRIPTION:
     ${jobDescription}
 
-    Return this exact JSON:
+    Return this exact JSON (no markdown wrapping):
     {
       "rewrittenBullets": [
         {
@@ -41,17 +43,11 @@ const rewriteBullets = async ({ resumeText, jobDescription, missingSkills }) => 
         "<specific tip for this job application>"
       ]
     }`)
-  ]);
+  ], 'bullet-rewrite', 0.7);
 
-  try {
-    const cleaned = response.content
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim();
-    return JSON.parse(cleaned);
-  } catch {
-    throw new Error('Failed to parse bullet rewrite response');
-  }
+  const parsed = parseJsonSafely(response.content, FALLBACK);
+  console.log(`✍️  rewriteBullets count: ${parsed.rewrittenBullets?.length ?? 0}`);
+  return parsed;
 };
 
 module.exports = { rewriteBullets };

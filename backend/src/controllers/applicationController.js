@@ -45,13 +45,19 @@ const createApplication = async (req, res) => {
 
     const application = await prisma.application.create({
       data: {
-        userId: req.userId,
+        userId:  req.userId,
         jobId,
         resumeId,
-        notes: notes || null
+        notes:   notes || null,
+        events: {
+          create: {
+            toStatus: 'APPLIED',
+            note:     'Application created'
+          }
+        }
       },
       include: {
-        job: { select: { company: true, role: true } },
+        job:    { select: { company: true, role: true } },
         resume: { select: { version: true, fileName: true } }
       }
     });
@@ -150,6 +156,9 @@ const getApplication = async (req, res) => {
             targetRole: true,
             content: true
           }
+        },
+        events: {
+          orderBy: { occurredAt: 'asc' }
         }
       }
     });
@@ -203,14 +212,27 @@ const updateApplicationStatus = async (req, res) => {
       });
     }
 
+    // Build event record if status is actually changing
+    const statusChanging = status && status !== application.status;
+
     const updated = await prisma.application.update({
       where: { id: req.params.id },
       data: {
-        ...(status && { status }),
-        ...(notes !== undefined && { notes })
+        ...(status           && { status }),
+        ...(notes !== undefined && { notes }),
+        ...(statusChanging && {
+          events: {
+            create: {
+              fromStatus: application.status,
+              toStatus:   status,
+              note:       `Status changed from ${application.status} to ${status}`
+            }
+          }
+        })
       },
       include: {
-        job: { select: { company: true, role: true } }
+        job:    { select: { company: true, role: true } },
+        events: { orderBy: { occurredAt: 'asc' } }
       }
     });
 

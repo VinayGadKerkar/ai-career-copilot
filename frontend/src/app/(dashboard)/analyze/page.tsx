@@ -99,7 +99,7 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-6 lg:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">AI Analyzer</h1>
         <p className="text-gray-400 mt-1">

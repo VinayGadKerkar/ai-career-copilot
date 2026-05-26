@@ -42,27 +42,43 @@ model Job {
   company      String
   role         String
   description  String        @db.Text
+  location     String?
+  salary       String?
+  applyUrl     String?
+  source       String?       @default("manual")
   applications Application[]
   createdAt    DateTime      @default(now())
 }
 
 model Application {
-  id             String            @id @default(cuid())
+  id             String             @id @default(cuid())
   userId         String
   jobId          String
   resumeId       String
-  status         ApplicationStatus @default(APPLIED)
+  status         ApplicationStatus  @default(APPLIED)
   fitScore       Int?
   skillGaps      String[]
-  tailoredResume String?           @db.Text
-  coldEmail      String?           @db.Text
+  tailoredResume String?            @db.Text
+  coldEmail      String?            @db.Text
   notes          String?
-  appliedAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  appliedAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  events         ApplicationEvent[]
 
   user   User   @relation(fields: [userId], references: [id])
   job    Job    @relation(fields: [jobId], references: [id])
   resume Resume @relation(fields: [resumeId], references: [id])
+}
+
+model ApplicationEvent {
+  id            String            @id @default(cuid())
+  applicationId String
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  note          String?
+  occurredAt    DateTime          @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
 
 model AnalysisJob {

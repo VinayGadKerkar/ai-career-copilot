@@ -1,18 +1,24 @@
-const { ChatGroq } = require('@langchain/groq');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
+const { parseJsonSafely } = require('../../utils/parseJsonSafely');
+const { invokeGroq } = require('../../config/groq');
 
-const llm = new ChatGroq({
-  apiKey: process.env.GROQ_API_KEY,
-  model: 'llama-3.3-70b-versatile',
-  temperature: 0.3
-});
+const FALLBACK = {
+  fitScore: 50,
+  matchedSkills: [],
+  missingSkills: [],
+  strongPoints: ['Could not analyze — try again'],
+  weakPoints: [],
+  experienceMatch: 'Fair',
+  summary: 'AI analysis unavailable right now. Please retry.'
+};
 
 const analyzeResume = async ({ resumeText, jobDescription }) => {
-  const response = await llm.invoke([
-    new SystemMessage(`You are an expert resume analyzer and career coach. 
-    Analyze resumes against job descriptions and return ONLY valid JSON.
-    No markdown, no explanation, just the JSON object.`),
-
+  const response = await invokeGroq([
+    new SystemMessage(
+      `You are an expert resume analyzer and career coach.
+      Analyze resumes against job descriptions and return ONLY valid JSON.
+      No markdown, no explanation, no code fences — just the raw JSON object.`
+    ),
     new HumanMessage(`
     Analyze this resume against the job description.
 
@@ -22,7 +28,7 @@ const analyzeResume = async ({ resumeText, jobDescription }) => {
     JOB DESCRIPTION:
     ${jobDescription}
 
-    Return this exact JSON structure:
+    Return this exact JSON structure (no markdown wrapping):
     {
       "fitScore": <number 0-100>,
       "matchedSkills": [<skills present in both resume and JD>],
@@ -32,17 +38,11 @@ const analyzeResume = async ({ resumeText, jobDescription }) => {
       "experienceMatch": "<Excellent|Good|Fair|Poor>",
       "summary": "<2 sentence overall assessment>"
     }`)
-  ]);
+  ], 'resume-analysis', 0.3);
 
-  try {
-    const cleaned = response.content
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim();
-    return JSON.parse(cleaned);
-  } catch {
-    throw new Error('Failed to parse resume analysis response');
-  }
+  const parsed = parseJsonSafely(response.content, FALLBACK);
+  console.log(`🧠 analyzeResume fitScore: ${parsed.fitScore}`);
+  return parsed;
 };
 
 module.exports = { analyzeResume };

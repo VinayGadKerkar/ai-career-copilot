@@ -9,6 +9,7 @@ const { createTopics } = require('./kafka/admin');
 const { runResumeParserConsumer } = require('./kafka/consumers/resumeParserConsumer');
 const { runAiAnalysisConsumer } = require('./kafka/consumers/aiAnalysisConsumer');
 const { runCompletionConsumer } = require('./kafka/consumers/completionConsumer');
+const { runInterviewPrepConsumer } = require('./kafka/consumers/interviewPrepConsumer');
 
 const app = express();
 
@@ -30,20 +31,37 @@ app.use('/api/resume', require('./routes/resume'));
 app.use('/api/jobs', require('./routes/jobs'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/analyze', require('./routes/analyze'));
+app.use('/api/interview', require('./routes/interview'));
 
 app.use(errorHandler);
 
 const start = async () => {
   try {
-    // Create Kafka topics on startup
-    await createTopics();
+    // Create Kafka topics on startup (non-fatal)
+    try {
+      await createTopics();
+    } catch (kafkaErr) {
+      console.warn('⚠️  Kafka topics unavailable (non-fatal):', kafkaErr.message);
+    }
 
-    // Start all consumers
-    await Promise.all([
-      runResumeParserConsumer(),
-      runAiAnalysisConsumer(),
-      runCompletionConsumer()
-    ]);
+    // Start consumers with automatic retry in the background
+    const startWithRetry = async (consumerFn, name) => {
+      while (true) {
+        try {
+          await consumerFn();
+          break; // Success
+        } catch (err) {
+          console.warn(`⚠️  Failed to start ${name} consumer: ${err.message}. Retrying in 5s...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      }
+    };
+
+    // Fire and forget so we don't block server startup
+    startWithRetry(runResumeParserConsumer, 'Resume Parser');
+    startWithRetry(runAiAnalysisConsumer, 'AI Analysis');
+    startWithRetry(runCompletionConsumer, 'Completion');
+    startWithRetry(runInterviewPrepConsumer, 'Interview Prep');
 
     const PORT = process.env.PORT || 8000;
     app.listen(PORT, () => {

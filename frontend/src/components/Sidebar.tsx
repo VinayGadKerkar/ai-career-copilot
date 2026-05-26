@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard, FileText, Briefcase,
-  ClipboardList, Zap, LogOut
+  ClipboardList, Zap, LogOut, BrainCircuit
 } from 'lucide-react';
 
 const navItems = [
@@ -13,7 +13,8 @@ const navItems = [
   { href: '/resumes',        icon: FileText,         label: 'Resumes'      },
   { href: '/jobs',           icon: Briefcase,        label: 'Jobs'         },
   { href: '/applications',   icon: ClipboardList,    label: 'Applications' },
-  { href: '/analyze',        icon: Zap,              label: 'AI Analyze'   }
+  { href: '/analyze',        icon: Zap,              label: 'AI Analyze'   },
+  { href: '/interview',      icon: BrainCircuit,     label: 'Interview Prep'},
 ];
 
 export default function Sidebar() {
