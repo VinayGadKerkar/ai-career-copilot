@@ -14,11 +14,12 @@ if (apiKeys.length === 0) {
 const DEFAULT_MODEL_MAX_TOKENS = Number(
   process.env.GROQ_DEFAULT_MODEL_MAX_TOKENS || 8192
 );
+
 const MODEL_MAX_TOKENS = {
-  "llama-3.1-8b-instant": 8192,
-  "llama-3.3-70b-versatile": 8192,
+  "llama-3.1-8b-instant": 8192,      // ← keep this as fast fallback
   "openai/gpt-oss-20b": 8192,
   "openai/gpt-oss-120b": 8192,
+  "moonshotai/kimi-k2-instruct": 8192,
 };
 
 const MAX_LLM_CACHE_SIZE = Number(process.env.GROQ_LLM_CACHE_MAX || 100);
@@ -45,19 +46,14 @@ function getMaxTokens(taskType) {
   switch (taskType) {
     case "bullet-rewrite":
       return 4096;
-
     case "email":
       return 2048;
-
     case "resume-analysis":
       return 4096;
-
     case "career-advice":
       return 8192;
-
     case "interview-prep":
       return 8192;
-
     default:
       return 4096;
   }
@@ -71,20 +67,24 @@ function getClampedMaxTokens(taskType, model) {
 
 /**
  * -----------------------------------------
- * MODEL ROUTING
+ * MODEL ROUTING — UPDATED FOR NEW MODELS
+ *
+ * Replacements:
+ *   llama-3.1-8b-instant    → qwen/qwen3-32b       (fast, efficient)
+ *   llama-3.3-70b-versatile → openai/gpt-oss-120b  (best quality)
+ *   openai/gpt-oss-20b      → openai/gpt-oss-20b   (unchanged)
  * -----------------------------------------
  */
 function getModelForTask(taskType) {
   switch (taskType) {
-
     case "email":
-      return "llama-3.1-8b-instant";
+      return "openai/gpt-oss-20b";      // fast + available
 
     case "resume-analysis":
-      return "llama-3.3-70b-versatile";
+      return "openai/gpt-oss-120b";     // best quality
 
     case "bullet-rewrite":
-      return "llama-3.3-70b-versatile";
+      return "openai/gpt-oss-120b";     // best quality
 
     case "career-advice":
       return "openai/gpt-oss-20b";
@@ -93,20 +93,21 @@ function getModelForTask(taskType) {
       return "openai/gpt-oss-20b";
 
     default:
-      return "llama-3.1-8b-instant";
+      return "openai/gpt-oss-20b";
   }
 }
 
 /**
  * -----------------------------------------
- * FALLBACK MODEL ORDER
+ * FALLBACK MODEL ORDER — UPDATED
+ * Ordered from fastest/cheapest to most capable
  * -----------------------------------------
  */
 const fallbackModels = [
-  "llama-3.1-8b-instant",
-  "llama-3.3-70b-versatile",
   "openai/gpt-oss-20b",
   "openai/gpt-oss-120b",
+  "moonshotai/kimi-k2-instruct",
+  "llama-3.1-8b-instant",             // last resort, still available
 ];
 
 /**
@@ -212,10 +213,7 @@ function getBackoffMs(attemptIndex) {
  */
 function trimText(text, maxChars = 6000) {
   if (!text) return "";
-
-  return text.length > maxChars
-    ? text.slice(0, maxChars)
-    : text;
+  return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
 
 /**
@@ -251,17 +249,12 @@ function getLLM(apiKey, model, temperature, taskType) {
  * MAIN INVOKER
  * -----------------------------------------
  */
-async function invokeGroq(
-  messages,
-  taskType = "default",
-  temperature = 0.7
-) {
+async function invokeGroq(messages, taskType = "default", temperature = 0.7) {
   if (apiKeys.length === 0) {
     throw new Error("No GROQ API keys configured.");
   }
 
   const primaryModel = getModelForTask(taskType);
-
   const configsToTry = [];
   const orderedKeys = getOrderedKeys();
 
@@ -269,33 +262,20 @@ async function invokeGroq(
     throw new Error("All GROQ API keys are invalid or cooling down.");
   }
 
-  /**
-   * Try primary model on all keys first
-   */
+  // Try primary model on all keys first
   for (const key of orderedKeys) {
-    configsToTry.push({
-      apiKey: key,
-      model: primaryModel,
-    });
+    configsToTry.push({ apiKey: key, model: primaryModel });
   }
 
-  /**
-   * Then fallback models
-   */
+  // Then fallback models on all keys
   for (const model of fallbackModels) {
     if (model === primaryModel) continue;
-
     for (const key of orderedKeys) {
-      configsToTry.push({
-        apiKey: key,
-        model,
-      });
+      configsToTry.push({ apiKey: key, model });
     }
   }
 
-  /**
-   * Start attempts
-   */
+  // Start attempts
   for (const config of configsToTry) {
     if (invalidApiKeys.has(config.apiKey)) continue;
     if ((keyCooldowns.get(config.apiKey) || 0) > Date.now()) continue;
@@ -308,18 +288,9 @@ async function invokeGroq(
           `🧠 [${taskType}] Trying Groq model: ${config.model} (key: ...${keySuffix})`
         );
 
-        const llm = getLLM(
-          config.apiKey,
-          config.model,
-          temperature,
-          taskType
-        );
-
+        const llm = getLLM(config.apiKey, config.model, temperature, taskType);
         const response = await llm.invoke(messages);
 
-        /**
-         * Empty response guard
-         */
         if (!response?.content || response.content.trim() === "") {
           throw new Error(`Model ${config.model} returned empty content`);
         }
@@ -334,10 +305,7 @@ async function invokeGroq(
         }
 
         if (isRateLimitError(err)) {
-          keyCooldowns.set(
-            config.apiKey,
-            Date.now() + RATE_LIMIT_COOLDOWN_MS
-          );
+          keyCooldowns.set(config.apiKey, Date.now() + RATE_LIMIT_COOLDOWN_MS);
           console.log(`⏳ Temporary rate limit on key ...${keySuffix}`);
         }
 
