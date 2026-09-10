@@ -16,8 +16,10 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: [
-    'https://dr89vchgph3s8.cloudfront.net', // production frontend
-    'http://localhost:3000',                  // local dev
+    'https://dr89vchgph3s8.cloudfront.net',                                  // production CloudFront
+    'http://ai-career-copilot-frontend.s3-website.ap-south-1.amazonaws.com', // S3 static website
+    'http://career-copilot.duckdns.org',                                     // custom domain
+    'http://localhost:3000',                                                  // local dev
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
