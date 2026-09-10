@@ -5,7 +5,16 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "benchmark": "node benchmarks/run-all.js",
+    "benchmark:redis": "node benchmarks/01-redis-rate-limiter.bench.js",
+    "benchmark:cache": "node benchmarks/02-interview-prep-cache.bench.js",
+    "benchmark:kafka": "node benchmarks/03-kafka-pipeline.bench.js",
+    "benchmark:dsa": "node benchmarks/04-dsa-cache.bench.js",
+    "benchmark:api": "node benchmarks/05-api-endpoints.bench.js",
+    "benchmark:pdf": "node benchmarks/06-pdf-parsing.bench.js",
+    "benchmark:groq": "node benchmarks/07-groq-resilience.bench.js",
+    "benchmark:offline": "node benchmarks/run-all.js --skip-server --skip-kafka"
   },
   "keywords": [],
   "author": "",

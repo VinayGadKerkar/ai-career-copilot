@@ -1,5 +1,5 @@
 const TOPICS = require('../topics');
-const { redis } = require('../../middleware/rateLimiter');
+const { getRedis } = require('../../middleware/rateLimiter');
 require('dotenv').config();
 
 const kafka = require("../client");
@@ -30,9 +30,12 @@ const runInterviewPrepConsumer = async () => {
       if (topic === TOPICS.ANALYSIS_REQUESTED) {
         console.log(`📥 [INTERVIEW-PREP-REQ] Request received for prepId: ${prepId}, applicationId: ${applicationId}`);
         try {
-          const cacheKey = `interview:prep:${userId}:${applicationId}`;
-          const existing = await redis.exists(cacheKey);
-          console.log(`   Cache hit: ${cacheHit}, Cache exists: ${existing === 1}`);
+          const client = getRedis();
+          if (client) {
+            const cacheKey = `interview:prep:${userId}:${applicationId}`;
+            const existing = await client.exists(cacheKey);
+            console.log(`   Cache hit: ${cacheHit}, Cache exists: ${existing === 1}`);
+          }
         } catch (error) {
           console.warn(`⚠️ [INTERVIEW-PREP-REQ] Redis check failed:`, error?.message);
         }
@@ -42,14 +45,17 @@ const runInterviewPrepConsumer = async () => {
         console.log(`   Source: ${resultSource}, Question counts:`, questionCounts);
         
         try {
-          const cacheKey = `interview:prep:${userId}:${applicationId}`;
-          if (resultSource === 'live') {
-            const cached = await redis.get(cacheKey);
-            if (cached) {
-              console.log(`✅ [INTERVIEW-PREP-READY] Successfully cached prepId: ${prepId}`);
+          const client = getRedis();
+          if (client) {
+            const cacheKey = `interview:prep:${userId}:${applicationId}`;
+            if (resultSource === 'live') {
+              const cached = await client.get(cacheKey);
+              if (cached) {
+                console.log(`✅ [INTERVIEW-PREP-READY] Successfully cached prepId: ${prepId}`);
+              }
+            } else {
+              console.log(`✅ [INTERVIEW-PREP-READY] Cache hit served for prepId: ${prepId}`);
             }
-          } else {
-            console.log(`✅ [INTERVIEW-PREP-READY] Cache hit served for prepId: ${prepId}`);
           }
         } catch (error) {
           console.warn(`⚠️ [INTERVIEW-PREP-READY] Redis operation failed:`, error?.message);

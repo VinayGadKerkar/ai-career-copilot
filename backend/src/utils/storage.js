@@ -5,13 +5,20 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const s3 = isProduction ? new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
+// Only pass explicit credentials if they are set.
+// On EC2/ECS with an IAM role, leave credentials undefined so the SDK
+// automatically uses the instance metadata service (IMDS).
+const s3Config = {
+  region: process.env.AWS_REGION || 'ap-south-1',
+};
+if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  s3Config.credentials = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  }
-}) : null;
+  };
+}
+
+const s3 = isProduction ? new S3Client(s3Config) : null;
 
 // Save a file (local or S3)
 const saveFile = async (buffer, fileName, mimeType) => {

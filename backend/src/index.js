@@ -14,7 +14,17 @@ const { runInterviewPrepConsumer } = require('./kafka/consumers/interviewPrepCon
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://dr89vchgph3s8.cloudfront.net', // production frontend
+    'http://localhost:3000',                  // local dev
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+// Handle OPTIONS preflight for all routes
+app.options('*', cors());
 app.use(morgan('dev'));
 app.use(express.json());
 

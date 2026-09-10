@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const prisma = require('../utils/prismaClient');
 const { generateInterviewQuestions } = require('../agents/tools/generateInterviewQuestions');
 const { getQuestionsForCompany } = require('../services/dsaQuestionService');
-const { redis } = require('../middleware/rateLimiter');
+const { getRedis } = require('../middleware/rateLimiter');
 const { publishEvent } = require('../kafka/producer');
 const TOPICS = require('../kafka/topics');
 const { trimText } = require('../config/groq');
@@ -83,8 +83,11 @@ const prepInterview = async (req, res) => {
 
     if (!forceRefresh) {
       try {
-        const cachedRaw = await redis.get(cacheKey);
-        cachedPayload = cachedRaw ? JSON.parse(cachedRaw) : null;
+        const client = getRedis();
+        if (client) {
+          const cachedRaw = await client.get(cacheKey);
+          cachedPayload = cachedRaw ? JSON.parse(cachedRaw) : null;
+        }
       } catch (error) {
         console.error('Interview prep cache read error:', error);
       }
@@ -156,12 +159,15 @@ const prepInterview = async (req, res) => {
     };
 
     try {
-      await redis.set(
-        cacheKey,
-        JSON.stringify(payload),
-        'EX',
-        INTERVIEW_PREP_CACHE_TTL_SECONDS
-      );
+      const client = getRedis();
+      if (client) {
+        await client.set(
+          cacheKey,
+          JSON.stringify(payload),
+          'EX',
+          INTERVIEW_PREP_CACHE_TTL_SECONDS
+        );
+      }
     } catch (error) {
       console.error('Interview prep cache write error:', error);
     }
